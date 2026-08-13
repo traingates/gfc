@@ -1,0 +1,12 @@
+{
+  "name": "gfc-tests",
+  "private": true,
+  "type": "module",
+  "description": "Headless smoke tests for the GFC site (jsdom).",
+  "dependencies": {
+    "jsdom": "^24.1.0"
+  },
+  "scripts": {
+    "test": "node smoke.mjs"
+  }
+}

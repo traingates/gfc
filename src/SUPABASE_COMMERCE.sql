@@ -10,7 +10,7 @@ create extension if not exists pgcrypto;
 
 -- Explicit administrator allowlist. A public Discord login is authenticated,
 -- but it is NOT an administrator unless its UUID is present here.
-create table if not exists public.gfc_admins (
+create table if not exists public.gfc_admins (d7228136-c14c-4ec8-a684-4fc2abf05ca0, e43789bc-46f9-475b-99cd-ec0ce164c9ab
   user_id uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
@@ -20,7 +20,7 @@ drop policy if exists "admins can read own role" on public.gfc_admins;
 create policy "admins can read own role" on public.gfc_admins
   for select to authenticated using (user_id = auth.uid());
 
- -- Run after replacing the UUID:
+-- Run after replacing the UUID:
 -- insert into public.gfc_admins (user_id)
 -- values ('ADMIN_USER_UUID') on conflict do nothing;
 

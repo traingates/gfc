@@ -20,7 +20,7 @@ drop policy if exists "admins can read own role" on public.gfc_admins;
 create policy "admins can read own role" on public.gfc_admins
   for select to authenticated using (user_id = auth.uid());
 
--- Run after replacing the UUID:
+ -- Run after replacing the UUID:
 -- insert into public.gfc_admins (user_id)
 -- values ('ADMIN_USER_UUID') on conflict do nothing;
 

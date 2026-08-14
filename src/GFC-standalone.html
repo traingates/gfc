@@ -1413,7 +1413,7 @@ const GFC_DATA = {
 
   /* ---- COMMERCE · public ticketing + account configuration --------------- */
   commerce: {
-    currency: "DCR",
+    currency: "DC$",
     ticketHelp: "Select your seats, sign in with Discord, then continue to checkout.",
     membershipHelp: "Support GFC and unlock member benefits.",
     discordInvite: ""
@@ -2238,7 +2238,7 @@ window.GFC_DATA = GFC_DATA;
   const ticketEventId = (f) => f.ticketId || slugify(`${f.event}-${f.date}`);
   const seatRows = (f) => String((f.tickets && f.tickets.rows) || "A,B,C,D,E,F")
     .split(",").map((x) => x.trim().toUpperCase()).filter(Boolean).slice(0, 20);
-  const money = (n) => `${Number(n || 0).toFixed(2)} ${esc((D.commerce && D.commerce.currency) || "DCR")}`;
+  const money = (n) => `${Number(n || 0).toFixed(2)} ${esc((D.commerce && D.commerce.currency) || "DC$")}`;
   function checkoutWithContext(url, params) {
     try {
       const out = new URL(url, location.href);
@@ -3623,7 +3623,7 @@ window.GFC_DATA = GFC_DATA;
         </label>
         <hr class="admin-hr">
         <div class="admin-panel-head"><h3>Tickets &amp; memberships</h3></div>
-        ${fieldHTML({ label:"Currency label", type:"text", hint:"Display-only, e.g. DCR, USD, EUR." }, d.commerce.currency, "commerce.currency")}
+        ${fieldHTML({ label:"Currency label", type:"text", hint:"Display-only, e.g. DC$, USD, EUR." }, d.commerce.currency, "commerce.currency")}
         ${fieldHTML({ label:"Ticket page intro", type:"textarea" }, d.commerce.ticketHelp, "commerce.ticketHelp")}
         ${fieldHTML({ label:"Membership page intro", type:"textarea" }, d.commerce.membershipHelp, "commerce.membershipHelp")}
         ${fieldHTML({ label:"Discord invite URL (optional)", type:"text" }, d.commerce.discordInvite, "commerce.discordInvite")}

@@ -10,7 +10,7 @@ create extension if not exists pgcrypto;
 
 -- Explicit administrator allowlist. A public Discord login is authenticated,
 -- but it is NOT an administrator unless its UUID is present here.
-create table if not exists public.gfc_admins (d7228136-c14c-4ec8-a684-4fc2abf05ca0, e43789bc-46f9-475b-99cd-ec0ce164c9ab
+create table if not exists public.gfc_admins ((user_id = auth.uid(55ebd09c-781d-4adb-b110-73e04d4f0a44));
   user_id uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );

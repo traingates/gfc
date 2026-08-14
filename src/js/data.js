@@ -48,7 +48,7 @@ const GFC_DATA = {
 
   /* ---- COMMERCE · public ticketing + account configuration --------------- */
   commerce: {
-    currency: "DCR",
+    currency: "DC$",
     ticketHelp: "Select your seats, sign in with Discord, then continue to checkout.",
     membershipHelp: "Support GFC and unlock member benefits.",
     discordInvite: ""

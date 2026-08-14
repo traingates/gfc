@@ -136,7 +136,7 @@ database. One-time setup:
    key.
 5. Open `index.html` and paste them into this line near the bottom:
    ```js
-   window.GFC_CLOUD = { url: "https://hwbwlpfwuryioojjlptc.supabase.co/rest/v1/", key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3YndscGZ3dXJ5aW9vampscHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NTg4MDIsImV4cCI6MjEwMjIzNDgwMn0.7bCe3fyTPmNrmYV2K2YNRACJhTOP9ZzfAaKOIqQC_Pc" };
+   window.GFC_CLOUD = { url: "https://hwbwlpfwuryioojjlptc.supabase.co", key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3YndscGZ3dXJ5aW9vampscHRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2NTg4MDIsImV4cCI6MjEwMjIzNDgwMn0.7bCe3fyTPmNrmYV2K2YNRACJhTOP9ZzfAaKOIqQC_Pc" };
    ```
 6. Redeploy (drag the folder to Cloudflare Pages again).
 

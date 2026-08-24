@@ -83,16 +83,24 @@ as $$
 declare
   v_user uuid := auth.uid();
   v_event jsonb;
+  v_tickets jsonb;
   v_price numeric;
+  v_total numeric := 0;
   v_order uuid := gen_random_uuid();
   v_exp timestamptz := now() + interval '15 minutes';
   v_seat text;
+  v_row text;
+  v_number integer;
+  v_type jsonb;
+  v_suite jsonb;
+  v_normalized text[];
 begin
   if v_user is null then raise exception 'Sign in required'; end if;
   if p_event_id is null or coalesce(array_length(p_seats,1),0) not between 1 and 8 then
     raise exception 'Choose between 1 and 8 seats';
   end if;
-  if (select count(distinct upper(x)) from unnest(p_seats) x) <> array_length(p_seats,1) then
+  select array_agg(upper(trim(x))) into v_normalized from unnest(p_seats) x;
+  if (select count(distinct x) from unnest(v_normalized) x) <> array_length(v_normalized,1) then
     raise exception 'Duplicate seat';
   end if;
 
@@ -103,23 +111,61 @@ begin
     and coalesce((event->'tickets'->>'enabled')::boolean,false)
   limit 1;
   if v_event is null then raise exception 'Event is not on sale'; end if;
-  v_price := greatest(coalesce((v_event->'tickets'->>'price')::numeric,0),0);
+  v_tickets := coalesce(v_event->'tickets','{}'::jsonb);
+  v_price := greatest(coalesce((v_tickets->>'price')::numeric,0),0);
 
   -- Release expired unpaid holds before applying the uniqueness constraint.
   delete from public.ticket_orders where status = 'pending' and expires_at <= now();
 
-  foreach v_seat in array p_seats loop
-    v_seat := upper(trim(v_seat));
-    if v_seat !~ '^[A-Z0-9]{1,4}[0-9]{1,3}$' then raise exception 'Invalid seat %', v_seat; end if;
+  foreach v_seat in array v_normalized loop
+    if v_seat ~ '^SUITE[0-9]{1,3}$' then
+      v_suite := coalesce(v_tickets->'suite','{}'::jsonb);
+      v_number := substring(v_seat from '[0-9]+$')::integer;
+      if not coalesce((v_suite->>'enabled')::boolean,false)
+         or v_number < 1 or v_number > greatest(coalesce((v_suite->>'quantity')::integer,0),0) then
+        raise exception 'Invalid suite %', v_seat;
+      end if;
+      if position(',' || v_seat || ',' in ',' || upper(replace(coalesce(v_suite->>'unavailableSuites',''),' ','')) || ',') > 0 then
+        raise exception 'Suite % is unavailable', v_seat;
+      end if;
+      v_total := v_total + greatest(coalesce((v_suite->>'price')::numeric,0),0);
+    else
+      if v_seat !~ '^[A-Z]{1,4}[0-9]{1,3}$' then raise exception 'Invalid seat %', v_seat; end if;
+      v_row := regexp_replace(v_seat,'[0-9]+$','');
+      v_number := substring(v_seat from '[0-9]+$')::integer;
+      if not (v_row = any(string_to_array(upper(replace(coalesce(v_tickets->>'rows',''),' ','')),',')))
+         or v_number < 1 or v_number > greatest(coalesce((v_tickets->>'seatsPerRow')::integer,0),0) then
+        raise exception 'Seat % is outside the configured map', v_seat;
+      end if;
+      if position(',' || v_seat || ',' in ',' || upper(replace(coalesce(v_tickets->>'unavailableSeats',''),' ','')) || ',') > 0 then
+        raise exception 'Seat % is unavailable', v_seat;
+      end if;
+
+      v_type := null;
+      select category into v_type
+      from jsonb_array_elements(coalesce(v_tickets->'seatTypes','[]'::jsonb)) category
+      where v_row = any(string_to_array(upper(replace(coalesce(category->>'rows',''),' ','')),','))
+      limit 1;
+      if v_type is null then
+        select category into v_type
+        from jsonb_array_elements(coalesce(v_tickets->'seatTypes','[]'::jsonb)) category
+        where lower(coalesce(category->>'name','')) = 'regular'
+        limit 1;
+      end if;
+      v_total := v_total + case
+        when coalesce((v_type->>'price')::numeric,0) > 0 then (v_type->>'price')::numeric
+        else v_price
+      end;
+    end if;
   end loop;
 
   insert into public.ticket_orders (id,event_id,user_id,seats,amount,status,expires_at)
-  values (v_order,p_event_id,v_user,(select array_agg(upper(trim(x))) from unnest(p_seats) x),v_price*array_length(p_seats,1),'pending',v_exp);
-  foreach v_seat in array p_seats loop
+  values (v_order,p_event_id,v_user,v_normalized,v_total,'pending',v_exp);
+  foreach v_seat in array v_normalized loop
     insert into public.ticket_seats (order_id,event_id,seat,user_id,expires_at)
-    values (v_order,p_event_id,upper(trim(v_seat)),v_user,v_exp);
+    values (v_order,p_event_id,v_seat,v_user,v_exp);
   end loop;
-  return query select v_order, v_price*array_length(p_seats,1), v_exp;
+  return query select v_order, v_total, v_exp;
 end;
 $$;
 

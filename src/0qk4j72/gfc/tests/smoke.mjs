@@ -98,13 +98,25 @@ setTimeout(() => {
     set('[data-path="tickets.rows"]', "A,B");
     set('[data-path="tickets.seatsPerRow"]', "4");
     set('[data-path="tickets.price"]', "25");
+    set('[data-path="tickets.seatTypes.0.rows"]', "B");
+    set('[data-path="tickets.seatTypes.0.price"]', "25");
+    set('[data-path="tickets.seatTypes.1.rows"]', "A");
+    set('[data-path="tickets.seatTypes.1.price"]', "40");
+    const suites = $('[data-path="tickets.suite.enabled"]'); suites.checked = true; fire(suites, "change");
+    set('[data-path="tickets.suite.price"]', "100");
+    set('[data-path="tickets.suite.quantity"]', "2");
+    set('[data-path="tickets.suite.capacity"]', "6");
     click($('[data-save="1"]'));
     nav("#tickets");
     ok("ticketed event appears", $("#view-tickets").textContent.includes("GFC Test Night"));
     click($("[data-ticket-event]"));
-    ok("seat map renders", $$("[data-seat]").length === 8);
+    ok("seat map renders", $$(".seat[data-seat]").length === 8);
+    ok("seat categories render", $("#view-tickets").textContent.includes("Floor") && $("[data-seat='A1']").getAttribute("title").includes("40.00"));
+    ok("suites render separately", $$(".suite-option").length === 2 && $("#view-tickets").textContent.includes("up to 6 guests"));
     click($("[data-seat='A1']"));
     ok("seat can be selected", $("[data-seat='A1']").classList.contains("selected"));
+    click($("[data-seat='SUITE1']"));
+    ok("mixed seat and suite pricing totals correctly", $(".ticket-summary").textContent.includes("140.00 DCR"));
 
     // Membership plans are managed from the same control room.
     nav("#admin");

@@ -166,7 +166,9 @@ news (with headlines flanking the hero), event posters, sponsors (with logos),
 hall of fame, an editable Info page, sponsor/banner **image uploads** to Supabase
 Storage, cloud saving with a real login, Open Graph link previews, ticketed
 events with a responsive seat map and collision-safe 15-minute holds, membership
-tiers, and public Discord authentication.
+tiers, and public Discord authentication. Ticketed events support admin-defined
+seat categories (Regular, Floor, Premium, or custom), row-specific prices, and
+Suite inventory sold separately from individual seats.
 
 ## 12. What's planned / not yet built
 
@@ -206,6 +208,10 @@ tiers, and public Discord authentication.
   enabling Discord.
 - **Money/secrets:** anon key OK in client; service_role never. Image uploads and
   the OG image live in Supabase Storage.
+- **Ticket categories:** category rows are comma-separated and the first explicit
+  row match wins. The category named `Regular` is the fallback for unmatched
+  rows. Suites use inventory IDs such as `SUITE1` and never appear in the seat
+  grid. Re-run `SUPABASE_COMMERCE.sql` whenever its reservation RPC changes.
 - After editing `js/`/`css/`, run `python3 build.py`, then redeploy the folder.
 
 ## 14. Testing

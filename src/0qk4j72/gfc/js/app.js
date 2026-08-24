@@ -24,6 +24,12 @@
   const LS_KEY   = "gfc_state_v2";
   const LOGO     = window.GFC_LOGO || "assets/logo.png";
   const clone    = (o) => JSON.parse(JSON.stringify(o));
+  const defaultSeatTypes = () => [
+    { name:"Regular", price:0, rows:"", description:"Standard arena seating" },
+    { name:"Floor", price:0, rows:"", description:"Floor-level seating" },
+    { name:"Premium", price:0, rows:"", description:"Premium-view seating" }
+  ];
+  const defaultSuite = () => ({ enabled:false, name:"Suite", price:0, quantity:0, capacity:0, unavailableSuites:"" });
 
   // Ensure a loaded state has every key the current version expects.
   function withDefaults(s) {
@@ -38,9 +44,13 @@
     if (!Array.isArray(out.videos)) out.videos = clone(DEFAULTS.videos);
     if (!Array.isArray(out.membershipPlans)) out.membershipPlans = clone(DEFAULTS.membershipPlans);
     if (!Array.isArray(out.upcomingFights)) out.upcomingFights = [];
-    out.upcomingFights = out.upcomingFights.map((f) => Object.assign({}, f, {
-      tickets: Object.assign({ enabled:false, venue:"", rows:"A,B,C,D,E,F", seatsPerRow:10, price:0, unavailableSeats:"", checkoutUrl:"" }, f.tickets || {})
-    }));
+    out.upcomingFights = out.upcomingFights.map((f) => {
+      const saved = f.tickets || {};
+      const tickets = Object.assign({ enabled:false, venue:"", rows:"A,B,C,D,E,F", seatsPerRow:10, price:0, unavailableSeats:"", checkoutUrl:"" }, saved);
+      tickets.seatTypes = Array.isArray(saved.seatTypes) ? saved.seatTypes : defaultSeatTypes();
+      tickets.suite = Object.assign(defaultSuite(), saved.suite || {});
+      return Object.assign({}, f, { tickets });
+    });
     return out;
   }
   function loadState() {
@@ -787,6 +797,33 @@
   const ticketEventId = (f) => f.ticketId || slugify(`${f.event}-${f.date}`);
   const seatRows = (f) => String((f.tickets && f.tickets.rows) || "A,B,C,D,E,F")
     .split(",").map((x) => x.trim().toUpperCase()).filter(Boolean).slice(0, 20);
+  const ticketSeatTypes = (f) => {
+    const types = f && f.tickets && Array.isArray(f.tickets.seatTypes) ? f.tickets.seatTypes : [];
+    return types.filter((x) => x && String(x.name || "").trim()).slice(0, 8);
+  };
+  const typeRows = (type) => String((type && type.rows) || "").split(",").map((x) => x.trim().toUpperCase()).filter(Boolean);
+  function seatTypeFor(f, seat) {
+    const row = String(seat || "").toUpperCase().replace(/[0-9]+$/, "");
+    const types = ticketSeatTypes(f);
+    const explicit = types.find((type) => typeRows(type).includes(row));
+    return explicit || types.find((type) => String(type.name).toLowerCase() === "regular") || { name:"Regular", price:(f.tickets || {}).price || 0, rows:"" };
+  }
+  function selectionPrice(f, id) {
+    if (/^SUITE[0-9]+$/i.test(id)) return Number((f.tickets.suite || {}).price) || 0;
+    const type = seatTypeFor(f, id);
+    const configured = Number(type.price);
+    return configured > 0 ? configured : (Number(f.tickets.price) || 0);
+  }
+  function ticketFromPrice(f) {
+    const prices = [Number((f.tickets || {}).price) || 0]
+      .concat(ticketSeatTypes(f).map((x) => Number(x.price) || 0));
+    if (f.tickets && f.tickets.suite && f.tickets.suite.enabled) prices.push(Number(f.tickets.suite.price) || 0);
+    const positive = prices.filter((x) => x > 0);
+    return positive.length ? Math.min(...positive) : 0;
+  }
+  const selectionLabel = (f, id) => /^SUITE([0-9]+)$/i.test(id)
+    ? `${esc(((f.tickets && f.tickets.suite) || {}).name || "Suite")} ${id.replace(/\D/g, "")}`
+    : esc(id);
   const money = (n) => `${Number(n || 0).toFixed(2)} ${esc((D.commerce && D.commerce.currency) || "DCR")}`;
   function checkoutWithContext(url, params) {
     try {
@@ -809,7 +846,7 @@
           <span class="kicker">${esc(shortDate(f.date))}</span>
           <h3>${esc(f.event)}</h3>
           <p>${esc(f.fighter1)} <b>vs</b> ${esc(f.fighter2)}</p>
-          <div class="ticket-meta"><span>${esc(t.venue || "Venue TBA")}</span><span>From ${money(t.price)}</span></div>
+          <div class="ticket-meta"><span>${esc(t.venue || "Venue TBA")}</span><span>From ${money(ticketFromPrice(f))}</span></div>
           <button class="btn btn-primary" data-ticket-event="${esc(ticketEventId(f))}">${active === f ? "Choosing seats" : "Choose seats"}</button>
         </div>
       </article>`;
@@ -825,6 +862,7 @@
 
   function seatPickerHTML(f) {
     const t = f.tickets || {};
+    const types = ticketSeatTypes(f);
     const rows = seatRows(f);
     const count = Math.max(1, Math.min(30, Number(t.seatsPerRow) || 10));
     const manual = String(t.unavailableSeats || "").split(",").map((x) => x.trim().toUpperCase()).filter(Boolean);
@@ -833,17 +871,31 @@
       const id = `${row}${i + 1}`;
       const blocked = unavailable.has(id);
       const on = selectedSeats.includes(id);
-      return `<button class="seat ${blocked ? "unavailable" : ""} ${on ? "selected" : ""}" data-seat="${esc(id)}" ${blocked ? "disabled" : ""} aria-label="Seat ${esc(id)}">${i + 1}</button>`;
+      const type = seatTypeFor(f, id);
+      const typeIndex = Math.max(0, types.indexOf(type));
+      return `<button class="seat type-${typeIndex % 4} ${blocked ? "unavailable" : ""} ${on ? "selected" : ""}" data-seat="${esc(id)}" ${blocked ? "disabled" : ""} aria-label="${esc(type.name)} seat ${esc(id)}, ${money(selectionPrice(f,id))}" title="${esc(type.name)} · ${money(selectionPrice(f,id))}">${i + 1}</button>`;
     }).join("")}</div></div>`).join("");
-    const total = (Number(t.price) || 0) * selectedSeats.length;
+    const suite = Object.assign(defaultSuite(), t.suite || {});
+    const suiteUnavailable = new Set(String(suite.unavailableSuites || "").split(",").map((x) => x.trim().toUpperCase()).filter(Boolean).concat(reservedSeats));
+    const suiteCount = Math.max(0, Math.min(50, Number(suite.quantity) || 0));
+    const suites = suite.enabled && suiteCount ? `<section class="suite-section"><div class="suite-copy"><span class="kicker">Private inventory</span><h3>${esc(suite.name || "Suite")}</h3><p>Separate from individual seating${suite.capacity ? ` · up to ${esc(suite.capacity)} guests each` : ""}</p></div><div class="suite-grid">${Array.from({length:suiteCount}, (_,i) => {
+      const id = `SUITE${i+1}`;
+      const blocked = suiteUnavailable.has(id);
+      const on = selectedSeats.includes(id);
+      return `<button class="suite-option ${blocked ? "unavailable" : ""} ${on ? "selected" : ""}" data-seat="${id}" ${blocked ? "disabled" : ""}><span>${esc(suite.name || "Suite")} ${i+1}</span><strong>${money(suite.price)}</strong><small>${blocked ? "Unavailable" : on ? "Selected" : "Select suite"}</small></button>`;
+    }).join("")}</div></section>` : "";
+    const total = selectedSeats.reduce((sum, id) => sum + selectionPrice(f, id), 0);
+    const categoryLegend = types.length ? `<div class="ticket-categories">${types.map((type,i) => `<span><i class="seat-demo type-${i % 4}"></i><b>${esc(type.name)}</b>${money(Number(type.price) > 0 ? type.price : t.price)}</span>`).join("")}</div>` : "";
     return `<div class="seat-picker reveal in">
       <div class="seat-picker-head"><div><span class="kicker">${esc(f.event)}</span><h2>Select your seats</h2></div>
         <button class="btn-sm btn-ghost" data-ticket-close>Close map</button></div>
       <div class="arena-screen"><span>ARENA</span></div>
       <div class="seat-map" aria-label="Seat map">${seats}</div>
+      ${categoryLegend}
       <div class="seat-legend"><span><i class="seat-demo"></i>Available</span><span><i class="seat-demo selected"></i>Selected</span><span><i class="seat-demo unavailable"></i>Taken</span></div>
+      ${suites}
       <div class="ticket-summary">
-        <div><span>Seats</span><strong>${selectedSeats.length ? esc(selectedSeats.join(", ")) : "None selected"}</strong></div>
+        <div><span>Tickets</span><strong>${selectedSeats.length ? selectedSeats.map((id) => selectionLabel(f,id)).join(", ") : "None selected"}</strong></div>
         <div><span>Total</span><strong>${money(total)}</strong></div>
         <button class="btn btn-primary" data-reserve-tickets ${selectedSeats.length ? "" : "disabled"}>${currentUser ? "Reserve & continue" : "Sign in with Discord"}</button>
       </div>
@@ -1661,7 +1713,7 @@
     fights: {
       label: "Upcoming fights", coll: "upcomingFights",
       title: (x) => x.event || "New fight",
-      blank: () => ({ event:"", belt:"", fighter1:"", fighter2:"", date:"", time:"", main:false, banner:"", ticketId:"", tickets:{ enabled:false, venue:"", rows:"A,B,C,D,E,F", seatsPerRow:10, price:0, unavailableSeats:"", checkoutUrl:"" } }),
+      blank: () => ({ event:"", belt:"", fighter1:"", fighter2:"", date:"", time:"", main:false, banner:"", ticketId:"", tickets:{ enabled:false, venue:"", rows:"A,B,C,D,E,F", seatsPerRow:10, price:0, unavailableSeats:"", checkoutUrl:"", seatTypes:defaultSeatTypes(), suite:defaultSuite() } }),
       fields: [
         { key:"event",    label:"Event name", type:"text" },
         { key:"belt",     label:"Belt / stakes (optional)", type:"text" },
@@ -1677,7 +1729,23 @@
           { key:"venue", label:"Venue / arena", type:"text" },
           { key:"rows", label:"Seat rows", type:"text", hint:"Comma-separated, e.g. A,B,C,D,E,F" },
           { key:"seatsPerRow", label:"Seats per row", type:"number" },
-          { key:"price", label:"Price per seat", type:"number" },
+          { key:"price", label:"Fallback / regular price", type:"number", hint:"Used for rows without a category-specific price." },
+          { key:"seatTypes", label:"Seating categories", type:"rows",
+            blank:() => ({ name:"", price:0, rows:"", description:"" }),
+            cols:[
+              { key:"name", label:"Category name", type:"text", hint:"Regular, Floor, Premium, or a custom name." },
+              { key:"price", label:"Price", type:"number" },
+              { key:"rows", label:"Rows", type:"text", hint:"Comma-separated, e.g. A,B" },
+              { key:"description", label:"Description", type:"text" }
+            ] },
+          { key:"suite", label:"Suites (separate from seating)", type:"group", fields:[
+            { key:"enabled", label:"Sell suites", type:"bool" },
+            { key:"name", label:"Product name", type:"text", hint:"e.g. Suite or VIP Suite" },
+            { key:"price", label:"Price per suite", type:"number" },
+            { key:"quantity", label:"Number of suites", type:"number" },
+            { key:"capacity", label:"Guests per suite", type:"number" },
+            { key:"unavailableSuites", label:"Unavailable suites", type:"text", hint:"Comma-separated, e.g. SUITE1,SUITE3" }
+          ] },
           { key:"unavailableSeats", label:"Manually unavailable seats", type:"text", hint:"Comma-separated, e.g. A1,A2,F10" },
           { key:"checkoutUrl", label:"Checkout URL", type:"text", hint:"Your Stripe/PayPal/other hosted checkout link." }
         ] }

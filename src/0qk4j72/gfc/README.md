@@ -59,7 +59,11 @@ This is the main way to add and edit content — no code required.
   streak, adds the bout to each fighter's history, drops it into Results, and
   removes it from the schedule. Past-dated fights show a **⚠ needs result** flag.
   Each event can also open ticket sales: set the arena, rows, seats per row,
-  price, manually unavailable seats, and your hosted checkout URL.
+  manually unavailable seats, and your hosted checkout URL. Seating categories
+  are fully configurable: the defaults are **Regular**, **Floor**, and
+  **Premium**, but admins can add, rename, price, remove, or assign categories
+  to any comma-separated set of rows. **Suites** are configured separately from
+  the seat map with their own price, quantity, capacity, and availability.
 - **Rankings** — order the ladder with up/down arrows, or *Auto-sort by record*.
   Crown the **reigning champion** by tapping **★ Champ** on any fighter — the
   champion is set here (independent of ladder position) and gets the gold badge
@@ -157,7 +161,10 @@ to local saving so nothing breaks.
    under **Memberships**. Checkout URLs should point to a hosted payment page.
 
 Seat holds are created transactionally in Supabase and expire after 15 minutes.
-The SQL prevents double-booking. A trusted payment webhook/Edge Function still
+The SQL prevents double-booking and calculates category/suite prices on the
+server rather than trusting the browser. Re-run `SUPABASE_COMMERCE.sql` after
+deploying the seat-category update so the reservation function understands the
+new inventory. A trusted payment webhook/Edge Function still
 needs to change ticket orders from `pending` to `paid` and membership orders from
 `pending` to `active`; never perform that step in browser JavaScript or expose a
 `service_role` key.
